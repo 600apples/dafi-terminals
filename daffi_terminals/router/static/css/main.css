@@ -50,6 +50,8 @@ body {
     -ms-flex-align: center;
     align-items: center !important;
     width: 15em;
+    position: relative;
+    cursor: pointer;
 }
 
 .terminal-worker-mdc:hover {
@@ -59,7 +61,7 @@ body {
 
 .selected {
     outline: 1px ridge white;
-      background: #373738;
+    background: #373738;
 }
 
 .terminal-worker-mdc-icon {
@@ -120,6 +122,19 @@ body {
     padding: 0;
     margin: 0 auto;
     display: flex;
+    position: relative;
+}
+
+.disconnected-overlay {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    background: #6c717880;
+    z-index: -1;
+    text-align: center;
+    display: none;
 }
 
 .terminal-container {
@@ -133,4 +148,41 @@ body {
     width: 100%;
     height: 100vh;
     background: #2a2830;
+}
+
+.close-terminal {
+    position: absolute;
+    top: -11px;
+    right: -12px;
+    display: block;
+    width: 50px;
+    height: 50px;
+    font-size: 0;
+}
+
+.close-terminal:before,
+.close-terminal:after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 20px;
+    background-color: #F0F0F0;
+    transform: rotate(45deg) translate(-50%, -50%);
+    transform-origin: top left;
+    content: '';
+}
+
+.close-terminal:after {
+    transform: rotate(-45deg) translate(-50%, -50%);
+}
+
+.close-terminal:before,
+.close-terminal:after {
+    width: 2px;
+}
+
+.close-terminal:before,
+.close-terminal:after {
+    height: 12px;
 }

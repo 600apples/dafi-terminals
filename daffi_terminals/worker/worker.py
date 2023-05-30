@@ -7,14 +7,11 @@ import struct
 import socket
 import logging
 from enum import Enum
-from pathlib import Path
 from threading import Thread
 from multiprocessing import Pipe
-from subprocess import check_output, CalledProcessError, DEVNULL
 
-from daffi import Global
 from daffi.utils import colors
-from daffi.registry import Callback
+from daffi.registry import Callback, Fetcher
 from daffi.settings import BYTES_CHUNK
 from daffi.exceptions import RemoteStoppedUnexpectedly
 from daffi.decorators import fetcher, local, __body_unknown__
@@ -29,35 +26,36 @@ class Command(bytes, Enum):
     RESIZE = b"2"
 
 
-@fetcher
-def write_to_terminal(term_id):
-    __body_unknown__(term_id)
+class RouterFetcher(Fetcher):
+
+    @fetcher
+    def write_to_terminal(self, term_id):
+        __body_unknown__(term_id)
 
 
-@fetcher
-def on_worker_connect(_, process_name: str):
-    """
-    Return common metadata information about worker.
-    Handler is being executed every time on connection (despite of it is first connection or re-connection)
-    """
-    host = socket.gethostname()
-    mac = ":".join(["{:02x}".format((uuid.getnode() >> ele) & 0xFF) for ele in range(0, 8 * 6, 8)][::-1])
-    return host, mac, process_name
-
-
-def on_worker_init(g: Global):
-    """The Global object init handler is executed only once for the first connection to the Router."""
-    arrow_sign = colors.intense_green("\u2B00")
-    math_sign = colors.intense_magenta("\uF50E")
-    print(
-        f"{arrow_sign} Worker {g.process_name!r} has been connected successfully.\n"
-        f"{math_sign} Happy exploring! {math_sign}"
-    )
+    @fetcher
+    def on_worker_connect(_, process_name: str):
+        """
+        Return common metadata information about worker.
+        Handler is being executed every time on connection (despite of it is first connection or re-connection)
+        """
+        arrow_sign = colors.intense_green("\u2B00")
+        math_sign = colors.intense_magenta("\uF50E")
+        print(
+            f"{arrow_sign} Worker {process_name!r} has been connected successfully.\n"
+            f"{math_sign} Happy exploring! {math_sign}"
+        )
+        host = socket.gethostname()
+        mac = ":".join(["{:02x}".format((uuid.getnode() >> ele) & 0xFF) for ele in range(0, 8 * 6, 8)][::-1])
+        return host, mac, process_name
 
 
 class Worker(Callback):
+
+    auto_init = False
+
     def __post_init__(self):
-        self.message_of_the_day = self.get_message_of_the_day()
+        self.router_fetcher = RouterFetcher()
 
     def read_from_terminal(self, term_id):
         exeargv = [os.getenv("SHELL", "sh")]
@@ -122,7 +120,7 @@ class Worker(Callback):
     @local
     def serve_user_input(self, term_id, write_pipe):
         try:
-            for data in write_to_terminal(term_id).get():
+            for data in self.router_fetcher.write_to_terminal(term_id).get():
                 write_pipe.send(data)
                 if data == Command.STOP:
                     write_pipe.close()
@@ -131,17 +129,3 @@ class Worker(Callback):
             logger.error(str(e))
             write_pipe.send(Command.STOP.value)
             write_pipe.close()
-
-    @local
-    def get_message_of_the_day(self):
-        """Get message of the day for terminal greeting"""
-        out = b""
-        # Not working as expected
-        mot_scripts_dir = Path("/etc/update-motd.d")
-        for script in sorted(mot_scripts_dir.iterdir()):
-            try:
-                out += check_output(["sh", script], stderr=DEVNULL)
-            except CalledProcessError:
-                out = b""
-                break
-        return out
