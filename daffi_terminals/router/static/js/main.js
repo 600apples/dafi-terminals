@@ -54,6 +54,7 @@ class DirectorSocket {
                 workerCloseButton.className = "close-terminal";
                 workerCloseButton.role = "button";
                 workerItem.prepend(workerCloseButton);
+
                 workerCloseButton.onclick = (ev) => {
                     ev.preventDefault();
                     ev.stopPropagation();

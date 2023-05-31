@@ -4,10 +4,10 @@ import asyncio
 import logging
 from pathlib import Path
 from threading import Event
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from contextlib import asynccontextmanager
 from queue import Queue
-from typing import Dict
+from typing import Dict, Optional
 from fastapi import FastAPI, WebSocket, APIRouter
 from fastapi.responses import FileResponse
 from daffi import Global, FG
@@ -28,7 +28,7 @@ class Worker:
     host: str
     mac: str
     process_name: str
-    active: bool
+    active: bool = field(repr=False)
 
     def serialize(self):
         return asdict(self)
@@ -36,7 +36,10 @@ class Worker:
 
 class WebHandler:
 
-    def __init__(self):
+    def __init__(self, web_host: str, web_port: int):
+        self.web_host = web_host
+        self.web_port = web_port
+
         self.ws_queues: Dict[int, Queue] = dict()
         self.director_sockets: Dict[int, WebSocket] = dict()
 
@@ -135,22 +138,35 @@ class WebHandler:
                 await director_socket.send_json([w.serialize() for w in self.workers.values()])
 
     def run(self):
-        Global(host="localhost", port=9999, init_controller=True,
-               process_name="TermRouter", on_node_disconnect=self.on_worker_disconnect)
-        uvicorn.run(self.app, port=8000, host="127.0.0.1")
+        uvicorn.run(self.app, port=self.web_port, host=self.web_host)
 
 
 class Router(Callback):
     auto_init = False
 
-    def __post_init__(self):
-        self.web_handler = WebHandler()
+    def __init__(
+            self, rpc_host: str, rpc_port: int, ssl_cert: Optional[str],
+            ssl_key: Optional[str], web_handler: WebHandler
+    ):
+        super().__init__()
+        self.name = "TermRouter"
+        self.rpc_host = rpc_host
+        self.rpc_port = rpc_port
+        self.ssl_cert = ssl_cert
+        self.ssl_key = ssl_key
+
+        self.web_handler = web_handler
         self.ws_queues = self.web_handler.ws_queues
         self.workers = self.web_handler.workers
         self.director_sockets = self.web_handler.director_sockets
 
     @local
     def run(self):
+        Global(
+            host=self.rpc_host, port=self.rpc_port, init_controller=True,
+            ssl_certificate=self.ssl_cert, ssl_key=self.ssl_key,
+            process_name=self.name, on_node_disconnect=self.web_handler.on_worker_disconnect
+        )
         self.web_handler.run()
 
     def write_to_terminal(self, term_id: int):
