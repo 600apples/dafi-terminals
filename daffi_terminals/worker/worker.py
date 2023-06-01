@@ -6,15 +6,17 @@ import uuid
 import struct
 import socket
 import logging
+import traceback
 from enum import Enum
 from threading import Thread
 from multiprocessing import Pipe
 
+from daffi import Global, FG
 from daffi.utils import colors
 from daffi.registry import Callback, Fetcher
 from daffi.settings import BYTES_CHUNK
-from daffi.exceptions import RemoteStoppedUnexpectedly
-from daffi.decorators import fetcher, local, __body_unknown__
+from daffi.exceptions import RemoteStoppedUnexpectedly, RemoteCallError
+from daffi.decorators import local, __body_unknown__
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("worker")
@@ -27,14 +29,14 @@ class Command(bytes, Enum):
 
 
 class RouterFetcher(Fetcher):
+    exec_modifier = FG(receiver="TermRouter")
 
-    @fetcher
-    def write_to_terminal(self, term_id):
+    @staticmethod
+    def write_to_terminal(term_id):
         __body_unknown__(term_id)
 
-
-    @fetcher
-    def on_worker_connect(_, process_name: str):
+    @staticmethod
+    def on_worker_connect(process_name: str):
         """
         Return common metadata information about worker.
         Handler is being executed every time on connection (despite of it is first connection or re-connection)
@@ -47,15 +49,28 @@ class RouterFetcher(Fetcher):
         )
         host = socket.gethostname()
         mac = ":".join(["{:02x}".format((uuid.getnode() >> ele) & 0xFF) for ele in range(0, 8 * 6, 8)][::-1])
-        return host, mac, process_name
+        return host, mac, process_name, os.getpid()
+
+    @local
+    def on_worker_connect_cb(self, g: Global, process_name: str):
+        # Send initial information about worker to `Router`
+        try:
+            self.on_worker_connect(process_name=process_name)
+        except RemoteCallError as e:
+            print(e)
+            if "already exists and is active" in e.message:
+                logger.error(traceback.format_exc())
+                g.stop()
+            else:
+                raise
 
 
 class Worker(Callback):
-
     auto_init = False
 
-    def __post_init__(self):
-        self.router_fetcher = RouterFetcher()
+    def __init__(self, router_fetcher: RouterFetcher):
+        super().__init__()
+        self.router_fetcher = router_fetcher
 
     def read_from_terminal(self, term_id):
         exeargv = [os.getenv("SHELL", "sh")]

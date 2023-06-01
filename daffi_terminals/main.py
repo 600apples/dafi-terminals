@@ -1,7 +1,5 @@
 import logging
 from argparse import ArgumentParser
-from daffi_terminals.router import start_router
-from daffi_terminals.worker import start_worker
 
 logging.basicConfig(level=logging.INFO)
 
@@ -13,7 +11,23 @@ if __name__ == '__main__':
     router_parser = subparsers.add_parser("start-router", help="Start router")
     worker_parser = subparsers.add_parser("start-worker", help="Start worker")
 
+    router_parser.add_argument("--rpc-host", help="Router rpc host (Interaction with workers)", required=True)
+    router_parser.add_argument("--rpc-port", help="Router rpc port (Interaction with workers", type=int, required=True)
+    router_parser.add_argument("--web-host", help="Router web host (Interaction with user)", required=True)
+    router_parser.add_argument("--web-port", help="Router web port (Interaction with user", type=int, required=True)
+    router_parser.add_argument("--ssl-cert", default=None, help="Path to ssl certificate")
+    router_parser.add_argument("--ssl-key", default=None, help="Path to ssl private key")
+
+    worker_parser.add_argument("--name", default=None, help="Worker name. If not provided default name will be generated")
+    worker_parser.add_argument("--rpc-host", help="Router host to connect", required=True)
+    worker_parser.add_argument("--rpc-port", help="Router port to connect", type=int, required=True)
+    worker_parser.add_argument("--ssl-cert", default=None, help="Path to ssl certificate")
+    worker_parser.add_argument("--ssl-key", default=None, help="Path to ssl private key")
+
+    args = parser.parse_args()
     if parser.parse_args().command == "start-router":
-        start_router(router_parser)
+        from daffi_terminals.router import start_router
+        start_router(args)
     else:
-        start_worker(worker_parser)
+        from daffi_terminals.worker import start_worker
+        start_worker(args)

@@ -23,11 +23,16 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("router")
 
 
+class NonUniqueNameDetected(Exception):
+    ...
+
+
 @dataclass
 class Worker:
     host: str
     mac: str
     process_name: str
+    pid: int
     active: bool = field(repr=False)
 
     def serialize(self):
@@ -113,15 +118,25 @@ class WebHandler:
     async def read_terminal_output(self, term_id: int, worker_id: str, websocket: WebSocket):
         """Get output data from remote terminal and write it to websocket"""
         exec_modifier = FG(receiver=worker_id)
-        read_term_iterator = await self.read_from_terminal.call(term_id=term_id, exec_modifier=exec_modifier)
         try:
-            async for out in read_term_iterator.get_async():
-                await websocket.send_bytes(out)
-        except RemoteStoppedUnexpectedly:
-            pass
+            read_term_iterator = await self.read_from_terminal.call(term_id=term_id, exec_modifier=exec_modifier)
         except Exception as e:
-            print(f"unexpected error: {e}")
+            print(f"unexpected error during read from remote terminal: {e}")
+        else:
+            try:
+                async for out in read_term_iterator.get_async():
+                    await websocket.send_bytes(out)
+            except RemoteStoppedUnexpectedly:
+                pass
         await websocket.close()
+        if existing_worker := self.workers.get(worker_id):
+            existing_worker.active = False
+            await self.update_workers()
+
+    async def update_workers(self):
+        """Send list of connected/disconnected workers through director socket."""
+        for director_socket in self.director_sockets.values():
+            await director_socket.send_json([w.serialize() for w in self.workers.values()])
 
     def on_worker_disconnect(self, _, process_name: str):
         if worker := self.workers.get(process_name):
@@ -134,8 +149,7 @@ class WebHandler:
     async def on_worker_disconnect_observer(self):
         while True:
             await asyncio.get_running_loop().run_in_executor(None, self.disconnect_worker_event.wait)
-            for director_socket in self.director_sockets.values():
-                await director_socket.send_json([w.serialize() for w in self.workers.values()])
+            await self.update_workers()
 
     def run(self):
         uvicorn.run(self.app, port=self.web_port, host=self.web_host)
@@ -183,10 +197,21 @@ class Router(Callback):
                 del self.ws_queues[term_id]
                 break
 
-    async def on_worker_connect(self, host, mac, process_name):
-        worker = Worker(host=host, mac=mac, process_name=process_name, active=True)
+    async def on_worker_connect(self, host, mac, process_name, pid):
+        duplicate_name_detected = False
+        worker = Worker(host=host, mac=mac, process_name=process_name, pid=pid, active=True)
+        # Check if worker with such `process_name` already exists
+        if existing_worker := self.workers.get(process_name):
+            if existing_worker.pid != worker.pid and existing_worker.active:
+                duplicate_name_detected = True
+                worker = existing_worker
+                existing_worker.active = False
         self.workers[process_name] = worker
         logger.info(f"{worker} has been connected.")
         print(f"{worker} has been connected.")
-        for director_socket in self.director_sockets.values():
-            await director_socket.send_json([w.serialize() for w in self.workers.values()])
+        await self.web_handler.update_workers()
+
+        if duplicate_name_detected:
+            raise NonUniqueNameDetected(f"Worker with name {process_name!r} already exists and is active."
+                                        f" To fix this re-connect existing worker with name {process_name!r}"
+                                        f" and make sure all workers have unique names.")
