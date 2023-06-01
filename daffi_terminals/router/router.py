@@ -32,7 +32,7 @@ class Worker:
     host: str
     mac: str
     process_name: str
-    pid: int
+    id: str
     active: bool = field(repr=False)
 
     def serialize(self):
@@ -197,12 +197,12 @@ class Router(Callback):
                 del self.ws_queues[term_id]
                 break
 
-    async def on_worker_connect(self, host, mac, process_name, pid):
+    async def on_worker_connect(self, host, mac, process_name, id):
         duplicate_name_detected = False
-        worker = Worker(host=host, mac=mac, process_name=process_name, pid=pid, active=True)
+        worker = Worker(host=host, mac=mac, process_name=process_name, id=id, active=True)
         # Check if worker with such `process_name` already exists
         if existing_worker := self.workers.get(process_name):
-            if existing_worker.pid != worker.pid and existing_worker.active:
+            if existing_worker.id != worker.id and existing_worker.active:
                 duplicate_name_detected = True
                 worker = existing_worker
                 existing_worker.active = False

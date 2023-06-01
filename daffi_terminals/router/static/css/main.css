@@ -131,10 +131,21 @@ body {
     right: 0;
     top: 0;
     bottom: 0;
-    background: #6c717880;
-    z-index: -1;
-    text-align: center;
+    background: #6c7178e8;
+    z-index: 9999;
     display: none;
+    text-align: center;
+}
+
+.disconnected-overlay-popup {
+    width: 230px;
+    height: 20px;
+    position: fixed;
+    top: calc(50% - 25px);
+    left: calc(50% - 50px);
+    padding: 40px;
+    border-radius: 2px;
+    background: #4d5591d9;
 }
 
 .terminal-container {

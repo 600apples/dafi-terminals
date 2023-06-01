@@ -31,12 +31,14 @@ class Command(bytes, Enum):
 class RouterFetcher(Fetcher):
     exec_modifier = FG(receiver="TermRouter")
 
+    def __post_init__(self):
+        self.id = str(uuid.uuid4())
+
     @staticmethod
     def write_to_terminal(term_id):
         __body_unknown__(term_id)
 
-    @staticmethod
-    def on_worker_connect(process_name: str):
+    def on_worker_connect(self, process_name: str):
         """
         Return common metadata information about worker.
         Handler is being executed every time on connection (despite of it is first connection or re-connection)
@@ -49,7 +51,7 @@ class RouterFetcher(Fetcher):
         )
         host = socket.gethostname()
         mac = ":".join(["{:02x}".format((uuid.getnode() >> ele) & 0xFF) for ele in range(0, 8 * 6, 8)][::-1])
-        return host, mac, process_name, os.getpid()
+        return host, mac, process_name, self.id
 
     @local
     def on_worker_connect_cb(self, g: Global, process_name: str):
@@ -57,7 +59,6 @@ class RouterFetcher(Fetcher):
         try:
             self.on_worker_connect(process_name=process_name)
         except RemoteCallError as e:
-            print(e)
             if "already exists and is active" in e.message:
                 logger.error(traceback.format_exc())
                 g.stop()

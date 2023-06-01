@@ -75,7 +75,9 @@ class DirectorSocket {
     };
 
     onclose(e) {
-        console.log("Director socket has been closed.")
+        console.log("Director socket has been closed.");
+        // pop up disconnected overlay.
+        document.querySelector(".disconnected-overlay").style.display = "block";
     };
 }
 
