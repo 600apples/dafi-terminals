@@ -92,9 +92,9 @@ class WebHandler:
         async for data in websocket.iter_json():
             if data["command"] == "delete_terminal":
                 term_id = data["term_id"]
-                del self.workers[term_id]
-                await websocket.send_json([w.serialize() for w in self.workers.values()])
-        del self.director_sockets[director_id]
+                self.workers.pop(term_id, None)
+                await self.update_workers()
+        self.director_sockets.pop(director_id, None)
 
     async def terminal(self, websocket: WebSocket):
         """Terminal socket handler"""
@@ -121,28 +121,27 @@ class WebHandler:
         try:
             read_term_iterator = await self.read_from_terminal.call(term_id=term_id, exec_modifier=exec_modifier)
         except Exception as e:
-            print(f"unexpected error during read from remote terminal: {e}")
+            logger.error(f"unexpected error during read from remote terminal: {e}")
         else:
             try:
                 async for out in read_term_iterator.get_async():
                     await websocket.send_bytes(out)
             except RemoteStoppedUnexpectedly:
-                pass
-        await websocket.close()
-        if existing_worker := self.workers.get(worker_id):
-            existing_worker.active = False
-            await self.update_workers()
+                if existing_worker := self.workers.get(worker_id):
+                    existing_worker.active = False
+                    await self.update_workers()
+            await websocket.close()
 
     async def update_workers(self):
         """Send list of connected/disconnected workers through director socket."""
+        workers = [w.serialize() for w in self.workers.values()]
         for director_socket in self.director_sockets.values():
-            await director_socket.send_json([w.serialize() for w in self.workers.values()])
+            await director_socket.send_json(workers)
 
     def on_worker_disconnect(self, _, process_name: str):
         if worker := self.workers.get(process_name):
             worker.active = False
             logger.info(f"{worker} has been disconnected.")
-            print(f"{worker} has been disconnected.")
             self.disconnect_worker_event.set()
             self.disconnect_worker_event = Event()
 
@@ -156,7 +155,6 @@ class WebHandler:
 
 
 class Router(Callback):
-    auto_init = False
 
     def __init__(
             self, rpc_host: str, rpc_port: int, ssl_cert: Optional[str],
@@ -208,7 +206,6 @@ class Router(Callback):
                 existing_worker.active = False
         self.workers[process_name] = worker
         logger.info(f"{worker} has been connected.")
-        print(f"{worker} has been connected.")
         await self.web_handler.update_workers()
 
         if duplicate_name_detected:

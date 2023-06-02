@@ -43,12 +43,8 @@ class RouterFetcher(Fetcher):
         Return common metadata information about worker.
         Handler is being executed every time on connection (despite of it is first connection or re-connection)
         """
-        arrow_sign = colors.intense_green("\u2B00")
         math_sign = colors.intense_magenta("\uF50E")
-        print(
-            f"{arrow_sign} Worker {process_name!r} has been connected successfully.\n"
-            f"{math_sign} Happy exploring! {math_sign}"
-        )
+        print(f"{math_sign} Happy exploring! {math_sign}")
         host = socket.gethostname()
         mac = ":".join(["{:02x}".format((uuid.getnode() >> ele) & 0xFF) for ele in range(0, 8 * 6, 8)][::-1])
         return host, mac, process_name, self.id
@@ -67,7 +63,6 @@ class RouterFetcher(Fetcher):
 
 
 class Worker(Callback):
-    auto_init = False
 
     def __init__(self, router_fetcher: RouterFetcher):
         super().__init__()

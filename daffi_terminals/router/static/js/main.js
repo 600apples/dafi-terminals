@@ -6,7 +6,7 @@ const WSURL = (() => {
 let terminalSock;
 
 const DATA = 1;
-const RESIZE = 2;
+const RESIZE = 2; // To be implemented
 
 window.onload = async () => {
     await new DirectorSocket().start();
@@ -92,7 +92,7 @@ async function createTerminal(ev) {
         return
     }
 
-     if (terminalSock) {
+    if (terminalSock) {
         terminalSock.close()
     }
     let workerId = targetLi.id;
@@ -115,12 +115,6 @@ async function createTerminal(ev) {
             foreground: 'white'
         }
     };
-    // if (url_opts_data.fontsize) {
-    //   var fontsize = window.parseInt(url_opts_data.fontsize);
-    //   if (fontsize && fontsize > 0) {
-    //     termOptions.fontSize = fontsize;
-    //   }
-    // }
 
     let terminal = new Terminal(termOptions);
 
@@ -134,13 +128,6 @@ async function createTerminal(ev) {
         terminal.fitAddon.fit();
 
         terminal.focus();
-        // state = CONNECTED;
-        // title_element.text = url_opts_data.title || default_title;
-        // if (url_opts_data.command) {
-        //   setTimeout(function () {
-        //     sock.send(new Blob([DATA, url_opts_data.command+'\r']));
-        //   }, 500);
-        // }
 
         terminal.onData(function (data) {
             terminalSock.send(new Blob([DATA, data]));
@@ -155,6 +142,9 @@ async function createTerminal(ev) {
 
     terminalSock.onclose = function (e) {
         terminal.dispose();
+        Array.prototype.slice.call(document.querySelectorAll('.terminal-worker-mdc')).forEach(function (element) {
+            element.classList.remove('selected');
+        });
     };
 
 
@@ -218,12 +208,6 @@ async function createTerminal(ev) {
     function term_write(text) {
         if (terminal) {
             terminal.write(text);
-            // if (!terminal.resized) {
-            //   resize_terminal(term);
-            //   term.resized = true;
-            // }
         }
     }
-
-
 }

@@ -3,12 +3,26 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "dafi-terminals"
+name = "daffi-terminals"
 description = "Remote terminal control"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 license = "MIT"
-keywords = ["rpc", "task", "queue", "job", "async", "python", "distributed", "stream", "grpc"]
+keywords = [
+    "rpc",
+    "remote",
+    "debug",
+    "debugging",
+    "remote control",
+    "ssh",
+    "webssh",
+    "python",
+    "distributed",
+    "stream",
+    "iot",
+    "embedded",
+    "async"
+]
 authors = [
   { name = "Volodymyr Boiko", email = "600apples@gmail.com" },
 ]
@@ -27,63 +41,40 @@ classifiers = [
     "Topic :: Software Development :: Object Brokering",
     "Topic :: Software Development :: Testing",
     "Topic :: System :: Clustering",
-    "Topic :: System :: Distributed Computing",
     "Topic :: System :: Monitoring",
     "Topic :: System :: Networking",
     "Topic :: System :: Systems Administration",
 ]
 dependencies = [
+    "fastapi>=0.95.0",
+    "uvicorn[standard]>=0.21.1",
+    "daffi>=2.2.1",
 ]
 dynamic = [
     "version",
 ]
+[project.scripts]
+dterm = "daffi_terminals.main:main"
 
 [project.urls]
-Documentation = "https://600apples.github.io/dafi/"
-Source = "https://github.com/600apples/dafi"
+Source = "https://github.com/600apples/dafi-terminals"
 
 [tool.hatch.version]
 path = "daffi_terminals/__about__.py"
+
+[tool.hatch.build]
+include = [
+  "docs/*.*",
+  "daffi_terminals/router/static/*.*",
+  "daffi_terminals/router/static/js/*.*",
+  "daffi_terminals/router/static/css/*.*",
+  "**/*.py",
+]
 
 [tool.hatch.envs.default.overrides]
 env.GITHUB_ACTIONS.env-vars = "COVERAGE_REPORT="
 
 [tool.hatch.envs.default]
-dependencies = [
-"fastapi>=0.95.0",
-"uvicorn[standard]>=0.21.1",
-]
-[tool.hatch.envs.default.scripts]
-cov = "export DAFFI_DEBUG=True && pytest --cov-report=term-missing --cov-config=pyproject.toml --cov=daffi --cov-report=html --cov=tests -s -vv {args}"
-cov_git = "export DAFFI_DEBUG=True && pytest --cov=daffi --cov-report={env:COVERAGE_REPORT:term-missing} --cov-config=pyproject.toml -s -vv -x"
-no_cov = "pytest -vv {args}"
-
-[tool.hatch.envs.docs]
-dependencies = [
-    "mkdocs==1.4.2",
-    "mkdocs-material==8.5.9",
-    "mkdocs-section-index==0.3.4",
-    "mkdocs-with-pdf==0.9.3",
-    "mkdocstrings-python==0.8.3",
-]
-[tool.hatch.envs.docs.scripts]
-build = "mkdocs build --clean --strict"
-serve = "mkdocs serve --dev-addr localhost:8000"
-deploy = "mkdocs gh-deploy --force"
-
-[tool.hatch.envs.lint]
-detached = true
-dependencies = [
-  "black>=22.6.0",
-  "mypy>=0.990",
-  "ruff>=0.0.176",
-]
-[tool.hatch.envs.lint.scripts]
-typing = "mypy --install-types --non-interactive {args:backend/src/hatchling src/hatch tests}"
-style = [
-  "ruff {args:.}",
-  "black --check --diff {args:.}",
-]
 fmt = [
   "black {args:.}",
   "ruff --fix {args:.}",
@@ -96,37 +87,6 @@ all = [
 
 [[tool.hatch.envs.test.matrix]]
 python = ["38", "39", "310", "311"]
-
-[tool.hatch.envs.coverage]
-detached = true
-dependencies = [
-  "coverage[toml]>=6.2",
-   "lxml",
-]
-
-[tool.hatch.envs.coverage.scripts]
-combine = "coverage combine {args}"
-report-xml = "coverage xml"
-report-json = "coverage json"
-report-uncovered-html = "coverage html --skip-covered --skip-empty"
-generate-summary = "python scripts/generate_coverage_summary.py"
-write-summary-report = "python scripts/write_coverage_summary_report.py"
-
-[tool.coverage.run]
-branch = true
-parallel = true
-omit = [
-  "tests/*",
-]
-
-[tool.coverage.report]
-exclude_lines = [
-  "no cov",
-  "if __name__ == .__main__.:",
-  "if TYPE_CHECKING:",
-]
-ignore_errors = true
-
 
 [tool.black]
 line-length = 120
